@@ -4,8 +4,8 @@ from typing import Union
 import numpy
 import torch
 
-from library.config import Config
-from library.network.predictor import Predictor, create_predictor
+from yukarin_soso.config import Config
+from yukarin_soso.network.predictor import Predictor, create_predictor
 
 
 class Generator(object):

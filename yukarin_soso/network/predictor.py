@@ -1,5 +1,5 @@
 import torch.nn.functional as F
-from library.config import NetworkConfig
+from yukarin_soso.config import NetworkConfig
 from torch import Tensor, nn
 
 

@@ -7,7 +7,7 @@ import numpy
 from torch.utils.data._utils.collate import default_convert
 from torch.utils.data.dataset import ConcatDataset, Dataset
 
-from library.config import DatasetConfig
+from yukarin_soso.config import DatasetConfig
 
 
 @dataclass

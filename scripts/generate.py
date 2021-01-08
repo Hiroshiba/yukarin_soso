@@ -4,9 +4,9 @@ from pathlib import Path
 from typing import Optional
 
 import yaml
-from library.config import Config
-from library.dataset import create_dataset
-from library.generator import Generator
+from yukarin_soso.config import Config
+from yukarin_soso.dataset import create_dataset
+from yukarin_soso.generator import Generator
 from tqdm import tqdm
 from utility.save_arguments import save_arguments
 

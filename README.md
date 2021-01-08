@@ -1,1 +1,1 @@
-# hiho-pytorch-base
+# yukarin_soso
