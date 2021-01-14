@@ -1,55 +1,43 @@
-from typing import NamedTuple
+from typing import Optional
 
-import torch
+import torch.nn.functional as F
 from pytorch_trainer import report
 from torch import Tensor, nn
-from torch.nn.functional import cross_entropy
 
-from yukarin_soso.config import ModelConfig, NetworkConfig
-from yukarin_soso.network.predictor import Predictor, create_predictor
-
-
-class Networks(NamedTuple):
-    predictor: Predictor
-
-
-def create_network(config: NetworkConfig):
-    return Networks(
-        predictor=create_predictor(config),
-    )
-
-
-def accuracy(output: Tensor, target: Tensor):
-    with torch.no_grad():
-        indexes = torch.argmax(output, dim=1)
-        correct = torch.eq(indexes, target).view(-1)
-        return correct.float().mean()
+from yukarin_soso.config import ModelConfig
+from yukarin_soso.network.predictor import Predictor
 
 
 class Model(nn.Module):
-    def __init__(self, model_config: ModelConfig, networks: Networks):
+    def __init__(self, model_config: ModelConfig, predictor: Predictor):
         super().__init__()
         self.model_config = model_config
-        self.predictor = networks.predictor
+        self.predictor = predictor
 
-    def __call__(
+    def forward(
         self,
-        feature: Tensor,
-        target: Tensor,
+        f0: Tensor,
+        phoneme: Tensor,
+        spec: Tensor,
+        silence: Tensor,
+        speaker_id: Optional[Tensor] = None,
     ):
-        feature = self.predictor(feature)
-        output = self.tail(feature, target)
+        batch_size = spec.shape[0]
 
-        loss = cross_entropy(output, target)
+        output = self.predictor(
+            f0=f0,
+            phoneme=phoneme,
+            speaker_id=speaker_id,
+        )
+
+        loss = F.l1_loss(input=output, target=spec)
+        if self.model_config.eliminate_silence:
+            loss = loss[~silence]
 
         # report
-        values = dict(
-            loss=loss,
-            accuracy=accuracy(output, target),
-        )
+        losses = dict(loss=loss)
         if not self.training:
-            weight = feature.shape[0]
-            values = {key: (l, weight) for key, l in values.items()}  # add weight
-        report(values, self)
+            losses = {key: (l, batch_size) for key, l in losses.items()}
+        report(losses, self)
 
         return loss

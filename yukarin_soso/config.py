@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Dict, Optional
 
 from yukarin_soso.utility import dataclass_utility
@@ -7,27 +8,36 @@ from yukarin_soso.utility.git_utility import get_branch_name, get_commit_id
 
 @dataclass
 class DatasetConfig:
-    feature_glob: str
-    target_glob: str
+    sampling_length: int
+    f0_glob: str
+    phoneme_glob: str
+    spec_glob: str
+    silence_glob: str
+    speaker_dict_path: Optional[Path]
+    num_speaker: Optional[int]
     test_num: int
-    eval_times_num: int = 1
+    test_trial_num: int = 1
     seed: int = 0
 
 
 @dataclass
 class NetworkConfig:
-    pass
+    input_feature_size: int
+    output_size: int
+    speaker_size: int
+    speaker_embedding_size: int
+    decoder_hidden_size: int
+    decoder_layer_num: int
 
 
 @dataclass
 class ModelConfig:
-    pass
+    eliminate_silence: bool
 
 
 @dataclass
 class TrainConfig:
     batch_size: int
-    eval_batch_size: Optional[int]
     log_iteration: int
     snapshot_iteration: int
     stop_iteration: int

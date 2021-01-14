@@ -15,7 +15,8 @@ from torch.optim.optimizer import Optimizer
 
 from yukarin_soso.config import Config
 from yukarin_soso.dataset import create_dataset
-from yukarin_soso.model import Model, create_network
+from yukarin_soso.model import Model
+from yukarin_soso.network.predictor import create_predictor
 from yukarin_soso.utility.pytorch_utility import init_weights
 from yukarin_soso.utility.trainer_extension import TensorboardReport, WandbReport
 from yukarin_soso.utility.trainer_utility import LowValueTrigger, create_iterator
@@ -34,8 +35,8 @@ def create_trainer(
         yaml.safe_dump(config.to_dict(), f)
 
     # model
-    networks = create_network(config.network)
-    model = Model(model_config=config.model, networks=networks)
+    predictor = create_predictor(config.network)
+    model = Model(model_config=config.model, predictor=predictor)
     if config.train.weight_initializer is not None:
         init_weights(model, name=config.train.weight_initializer)
 
@@ -46,7 +47,6 @@ def create_trainer(
     _create_iterator = partial(
         create_iterator,
         batch_size=config.train.batch_size,
-        eval_batch_size=config.train.eval_batch_size,
         num_processes=config.train.num_processes,
         use_multithread=config.train.use_multithread,
     )
@@ -54,7 +54,6 @@ def create_trainer(
     datasets = create_dataset(config.dataset)
     train_iter = _create_iterator(datasets["train"], for_train=True)
     test_iter = _create_iterator(datasets["test"], for_train=False)
-    eval_iter = _create_iterator(datasets["eval"], for_train=False)
 
     warnings.simplefilter("error", MultiprocessIterator.TimeoutWarning)
 
@@ -93,7 +92,7 @@ def create_trainer(
     trainer.extend(ext, name="test", trigger=trigger_log)
 
     ext = extensions.snapshot_object(
-        networks.predictor,
+        predictor,
         filename="predictor_{.updater.iteration}.pth",
         n_retains=5,
     )
