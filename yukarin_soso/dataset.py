@@ -65,10 +65,11 @@ class FeatureDataset(Dataset):
         phoneme = resample(rate=rate, data=phoneme_data)
         silence = resample(rate=rate, data=silence_data)
 
-        length = len(spec_data.array)
-        assert numpy.abs(length - len(f0)) < 5
-        assert numpy.abs(length - len(phoneme)) < 5
-        assert numpy.abs(length - len(silence)) < 5
+        assert numpy.abs(len(spec_data.array) - len(f0)) < 5
+        assert numpy.abs(len(spec_data.array) - len(phoneme)) < 5
+        assert numpy.abs(len(spec_data.array) - len(silence)) < 5
+
+        length = min(len(spec_data.array), len(f0), len(phoneme), len(silence))
 
         for _ in range(10000):
             offset = numpy.random.randint(length - sampling_length + 1)
@@ -78,10 +79,15 @@ class FeatureDataset(Dataset):
         else:
             raise Exception("cannot pick not silence data")
 
+        if silence.ndim == 2:
+            silence = numpy.squeeze(silence, axis=1)
+
         return dict(
-            f0=f0[offset : offset + sampling_length],
-            phoneme=phoneme[offset : offset + sampling_length],
-            spec=spec_data.array[offset : offset + sampling_length],
+            f0=f0[offset : offset + sampling_length].astype(numpy.float32),
+            phoneme=phoneme[offset : offset + sampling_length].astype(numpy.float32),
+            spec=spec_data.array[offset : offset + sampling_length].astype(
+                numpy.float32
+            ),
             silence=silence[offset : offset + sampling_length],
         )
 
@@ -180,7 +186,7 @@ def create_dataset(config: DatasetConfig):
 
         if speaker_ids is not None:
             dataset = SpeakerFeatureDataset(
-                wave_dataset=dataset,
+                dataset=dataset,
                 speaker_ids=[speaker_ids[fn] for fn in fns],
             )
 

@@ -17,6 +17,8 @@ class Predictor(nn.Module):
     ):
         super().__init__()
 
+        self.with_speaker = speaker_size > 0
+
         self.speaker_embedder = (
             nn.Embedding(
                 num_embeddings=speaker_size,
@@ -42,14 +44,11 @@ class Predictor(nn.Module):
             out_features=output_size,
         )
 
-    @property
-    def with_speaker(self):
-        return self.speaker_size > 0
-
     def forward(self, f0: Tensor, phoneme: Tensor, speaker_id: Optional[Tensor]):
         feature = torch.cat((f0, phoneme), dim=2)
 
         if self.with_speaker:
+            speaker_id = self.speaker_embedder(speaker_id)
             speaker_id = speaker_id.unsqueeze(dim=1)  # (batch_size, 1, ?)
             speaker_feature = speaker_id.expand(
                 speaker_id.shape[0], feature.shape[1], speaker_id.shape[2]
