@@ -1,11 +1,21 @@
 from pathlib import Path
-from typing import Union
+from typing import Any, Union
 
 import numpy
 import torch
+from torch import Tensor
 
 from yukarin_soso.config import Config
 from yukarin_soso.network.predictor import Predictor, create_predictor
+
+
+def to_tensor(array: Union[Tensor, numpy.ndarray, Any]):
+    if not isinstance(array, (Tensor, numpy.ndarray)):
+        array = numpy.asarray(array)
+    if isinstance(array, numpy.ndarray):
+        return torch.from_numpy(array)
+    else:
+        return array
 
 
 class Generator(object):
@@ -26,12 +36,15 @@ class Generator(object):
 
     def generate(
         self,
-        feature: Union[numpy.ndarray, torch.Tensor],
+        f0: Union[numpy.ndarray, torch.Tensor],
+        phoneme: Union[numpy.ndarray, torch.Tensor],
+        speaker_id: Union[numpy.ndarray, torch.Tensor] = None,
     ):
-        if isinstance(feature, numpy.ndarray):
-            feature = torch.from_numpy(feature)
-        feature = feature.to(self.device)
+        f0 = to_tensor(f0)
+        phoneme = to_tensor(phoneme)
+        if speaker_id is not None:
+            speaker_id = to_tensor(speaker_id)
 
         with torch.no_grad():
-            output = self.predictor(feature.unsqueeze(0))[0]
-        return output.numpy()
+            output = self.predictor(f0=f0, phoneme=phoneme, speaker_id=speaker_id)
+        return output.cpu().numpy()
