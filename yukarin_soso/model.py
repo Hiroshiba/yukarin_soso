@@ -30,10 +30,10 @@ class Model(nn.Module):
             speaker_id=speaker_id,
         )
 
+        loss = F.l1_loss(input=output, target=spec, reduction="none")
         if self.model_config.eliminate_silence:
-            output = output[~silence]
-            spec = spec[~silence]
-        loss = F.l1_loss(input=output, target=spec)
+            loss = loss[~silence]
+        loss = loss.mean()
 
         # report
         losses = dict(loss=loss)

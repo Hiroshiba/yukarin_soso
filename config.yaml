@@ -13,18 +13,18 @@ network:
   input_feature_size: 40
   output_size: 80
   speaker_size: 100
-  speaker_embedding_size: 25
-  decoder_hidden_size: 1024
-  decoder_layer_num: 8
+  speaker_embedding_size: 16
+  decoder_hidden_size: 256
+  decoder_layer_num: 4
 
 model:
-  eliminate_silence: true
+  eliminate_silence: false
 
 train:
   batch_size: 32
   log_iteration: 1000
   snapshot_iteration: 20000
-  stop_iteration: 500000
+  stop_iteration: 1000000
   optimizer:
     name: "adam"
     lr: 1.0e-4

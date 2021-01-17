@@ -31,8 +31,14 @@ class Predictor(nn.Module):
         input_size = input_feature_size + (
             speaker_embedding_size if self.with_speaker else 0
         )
+
+        self.pre = nn.Linear(
+            in_features=input_size,
+            out_features=decoder_hidden_size,
+        )
+
         self.decoder = nn.GRU(
-            input_size=input_size,
+            input_size=decoder_hidden_size,
             hidden_size=decoder_hidden_size,
             num_layers=decoder_layer_num,
             batch_first=True,
@@ -57,7 +63,8 @@ class Predictor(nn.Module):
                 (feature, speaker_feature), dim=2
             )  # (batch_size, length, ?)
 
-        h, _ = self.decoder(feature)
+        h = self.pre(feature)
+        h, _ = self.decoder(h)
         return self.post(h)
 
 
