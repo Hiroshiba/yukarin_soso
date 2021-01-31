@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 from yukarin_soso.utility import dataclass_utility
 from yukarin_soso.utility.git_utility import get_branch_name, get_commit_id
@@ -26,8 +26,10 @@ class NetworkConfig:
     output_size: int
     speaker_size: int
     speaker_embedding_size: int
-    decoder_hidden_size: int
-    decoder_layer_num: int
+    cnn_hidden_size_list: List[int]
+    cnn_kernel_size_list: List[int]
+    rnn_hidden_size: int
+    rnn_layer_num: int
 
 
 @dataclass

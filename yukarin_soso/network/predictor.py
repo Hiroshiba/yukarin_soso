@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional
 
 import torch
 from torch import Tensor, nn
@@ -12,9 +12,14 @@ class Predictor(nn.Module):
         output_size: int,
         speaker_size: int,
         speaker_embedding_size: int,
-        decoder_hidden_size: int,
-        decoder_layer_num: int,
+        cnn_hidden_size_list: List[int],
+        cnn_kernel_size_list: List[int],
+        rnn_hidden_size: int,
+        rnn_layer_num: int,
     ):
+        cnn_layer_num = len(cnn_hidden_size_list)
+        assert len(cnn_kernel_size_list) == cnn_layer_num
+
         super().__init__()
 
         self.with_speaker = speaker_size > 0
@@ -28,30 +33,46 @@ class Predictor(nn.Module):
             else None
         )
 
+        # cnn
         input_size = input_feature_size + (
             speaker_embedding_size if self.with_speaker else 0
         )
 
-        self.pre = nn.Linear(
-            in_features=input_size,
-            out_features=decoder_hidden_size,
-        )
+        cnn: List[nn.Module] = []
+        for i in range(cnn_layer_num):
+            cnn.append(
+                nn.utils.weight_norm(
+                    nn.Conv1d(
+                        in_channels=(
+                            cnn_hidden_size_list[i - 1] if i > 0 else input_size
+                        ),
+                        out_channels=cnn_hidden_size_list[i],
+                        kernel_size=cnn_kernel_size_list[i],
+                        padding=cnn_kernel_size_list[i] // 2,
+                    )
+                )
+            )
+            if i < cnn_layer_num - 1:
+                cnn.append(nn.SiLU(inplace=True))
+        self.cnn = nn.Sequential(*cnn)
 
-        self.decoder = nn.GRU(
-            input_size=decoder_hidden_size,
-            hidden_size=decoder_hidden_size,
-            num_layers=decoder_layer_num,
+        # rnn
+        self.rnn = nn.GRU(
+            input_size=cnn_hidden_size_list[-1],
+            hidden_size=rnn_hidden_size,
+            num_layers=rnn_layer_num,
             batch_first=True,
             bidirectional=True,
         )
 
+        # post
         self.post = nn.Linear(
-            in_features=decoder_hidden_size * 2,
+            in_features=rnn_hidden_size * 2,
             out_features=output_size,
         )
 
     def forward(self, f0: Tensor, phoneme: Tensor, speaker_id: Optional[Tensor]):
-        feature = torch.cat((f0, phoneme), dim=2)
+        feature = torch.cat((f0, phoneme), dim=2)  # (batch_size, length, ?)
 
         if self.with_speaker:
             speaker_id = self.speaker_embedder(speaker_id)
@@ -63,8 +84,8 @@ class Predictor(nn.Module):
                 (feature, speaker_feature), dim=2
             )  # (batch_size, length, ?)
 
-        h = self.pre(feature)
-        h, _ = self.decoder(h)
+        h = self.cnn(feature.transpose(1, 2)).transpose(1, 2)  # (batch_size, length, ?)
+        h, _ = self.rnn(h)
         return self.post(h)
 
 
@@ -74,6 +95,8 @@ def create_predictor(config: NetworkConfig):
         output_size=config.output_size,
         speaker_size=config.speaker_size,
         speaker_embedding_size=config.speaker_embedding_size,
-        decoder_hidden_size=config.decoder_hidden_size,
-        decoder_layer_num=config.decoder_layer_num,
+        cnn_hidden_size_list=config.cnn_hidden_size_list,
+        cnn_kernel_size_list=config.cnn_kernel_size_list,
+        rnn_hidden_size=config.rnn_hidden_size,
+        rnn_layer_num=config.rnn_layer_num,
     )

@@ -72,7 +72,10 @@ class FeatureDataset(Dataset):
         length = min(len(spec_data.array), len(f0), len(phoneme), len(silence))
 
         for _ in range(10000):
-            offset = numpy.random.randint(length - sampling_length + 1)
+            if length > sampling_length + 1:
+                offset = numpy.random.randint(length - sampling_length + 1)
+            else:
+                offset = 0
             s = numpy.squeeze(silence[offset : offset + sampling_length])
             if not s.all():
                 break

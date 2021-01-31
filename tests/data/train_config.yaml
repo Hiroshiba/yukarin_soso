@@ -1,21 +1,37 @@
 dataset:
-  feature_glob: "/path/to/feature-npy/*.npy"
-  target_glob: "/path/to/target-npy/*.npy"
+  sampling_length: 256
+  f0_glob: "/path/to/f0/*.npy"
+  phoneme_glob: "/path/to/phoneme/*.npy"
+  spec_glob: "/path/to/spec/*.npy"
+  silence_glob: "/path/to/silence/*.npy"
+  speaker_dict_path: "/path/to/speaker_dict_path.json"
+  num_speaker: 100
   test_num: 100
-  seed: 0
+  test_trial_num: 5
 
-network: {}
+network:
+  input_feature_size: 40
+  output_size: 80
+  speaker_size: 100
+  speaker_embedding_size: 16
+  cnn_hidden_size_list: [64, 64, 64, 64, 64, 64, 64, 64]
+  cnn_kernel_size_list: [7, 7, 7, 7, 7, 7, 7, 7]
+  rnn_hidden_size: 128
+  rnn_layer_num: 2
 
-model: {}
+model:
+  eliminate_silence: false
 
 train:
-  batch_size: 100
+  batch_size: 32
   log_iteration: 1000
-  snapshot_iteration: 100000
-  stop_iteration: 100000
+  snapshot_iteration: 20000
+  stop_iteration: 1000000
   optimizer:
     name: "adam"
-    lr: 0.001
+    lr: 3.0e-4
+  weight_initializer: "orthogonal"
 
 project:
   name: null
+  tags: {}
