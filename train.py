@@ -3,6 +3,7 @@ from pathlib import Path
 
 import yaml
 
+from yukarin_soso.config import Config
 from yukarin_soso.trainer import create_trainer
 
 
@@ -11,9 +12,9 @@ def train(
     output: Path,
 ):
     with config_yaml_path.open() as f:
-        d = yaml.safe_load(f)
+        config = Config.from_dict(yaml.safe_load(f))
 
-    trainer = create_trainer(config_dict=d, output=output)
+    trainer = create_trainer(config=config, output=output)
     trainer.run()
 
 

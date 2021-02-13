@@ -10,24 +10,21 @@ from pytorch_trainer.iterators import MultiprocessIterator
 from pytorch_trainer.training import Trainer, extensions
 from pytorch_trainer.training.updaters import StandardUpdater
 from tensorboardX import SummaryWriter
-from torch import optim
-from torch.optim.optimizer import Optimizer
 
 from yukarin_soso.config import Config
 from yukarin_soso.dataset import create_dataset
 from yukarin_soso.model import Model
 from yukarin_soso.network.predictor import create_predictor
-from yukarin_soso.utility.pytorch_utility import init_weights
+from yukarin_soso.utility.pytorch_utility import init_weights, make_optimizer
 from yukarin_soso.utility.trainer_extension import TensorboardReport, WandbReport
 from yukarin_soso.utility.trainer_utility import LowValueTrigger, create_iterator
 
 
 def create_trainer(
-    config_dict: Dict[str, Any],
+    config: Config,
     output: Path,
 ):
     # config
-    config = Config.from_dict(config_dict)
     config.add_git_info()
 
     output.mkdir(exist_ok=True, parents=True)
@@ -58,16 +55,7 @@ def create_trainer(
     warnings.simplefilter("error", MultiprocessIterator.TimeoutWarning)
 
     # optimizer
-    cp: Dict[str, Any] = copy(config.train.optimizer)
-    n = cp.pop("name").lower()
-
-    optimizer: Optimizer
-    if n == "adam":
-        optimizer = optim.Adam(model.parameters(), **cp)
-    elif n == "sgd":
-        optimizer = optim.SGD(model.parameters(), **cp)
-    else:
-        raise ValueError(n)
+    optimizer = make_optimizer(config_dict=config.train.optimizer, model=model)
 
     # updater
     updater = StandardUpdater(

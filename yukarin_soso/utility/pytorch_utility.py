@@ -1,7 +1,10 @@
-from typing import Callable
+from copy import deepcopy
+from typing import Any, Callable, Dict
 
 import torch
-from torch import nn
+import torch_optimizer
+from torch import nn, optim
+from torch.optim.optimizer import Optimizer
 
 
 def init_weights(model: torch.nn.Module, name: str):
@@ -31,3 +34,22 @@ def init_weights(model: torch.nn.Module, name: str):
                 initializer(param)
 
     model.apply(_init_weights)
+
+
+def make_optimizer(config_dict: Dict[str, Any], model: nn.Module):
+    cp: Dict[str, Any] = deepcopy(config_dict)
+    n = cp.pop("name").lower()
+
+    optimizer: Optimizer
+    if n == "adam":
+        optimizer = optim.Adam(model.parameters(), **cp)
+    elif n == "radam":
+        optimizer = torch_optimizer.RAdam(model.parameters(), **cp)
+    elif n == "ranger":
+        optimizer = torch_optimizer.Ranger(model.parameters(), **cp)
+    elif n == "sgd":
+        optimizer = optim.SGD(model.parameters(), **cp)
+    else:
+        raise ValueError(n)
+
+    return optimizer

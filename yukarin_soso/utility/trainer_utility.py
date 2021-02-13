@@ -1,9 +1,16 @@
+from typing import Tuple, Union
+
+import optuna
+import pytorch_trainer
+import torch
 from pytorch_trainer import reporter
 from pytorch_trainer.iterators import (
     MultiprocessIterator,
     MultithreadIterator,
     SerialIterator,
 )
+from pytorch_trainer.training.extension import Extension
+from pytorch_trainer.training.triggers import IntervalTrigger, ManualScheduleTrigger
 from pytorch_trainer.training.util import get_trigger
 from torch.utils.data import Dataset
 
@@ -118,3 +125,62 @@ class LowValueTrigger(BetterValueTrigger):
         super(LowValueTrigger, self).__init__(
             key, lambda min_value, new_value: new_value < min_value, stock_num, trigger
         )
+
+
+class PruningExtension(Extension):
+    def __init__(
+        self,
+        trial: optuna.trial.Trial,
+        observation_key: str,
+        pruner_trigger: Union[
+            Tuple[(int, str)], IntervalTrigger, ManualScheduleTrigger
+        ],
+    ) -> None:
+        self._trial = trial
+        self._observation_key = observation_key
+        self._pruner_trigger = pytorch_trainer.training.get_trigger(pruner_trigger)
+        if not isinstance(
+            self._pruner_trigger, (IntervalTrigger, ManualScheduleTrigger)
+        ):
+            pruner_type = type(self._pruner_trigger)
+            raise TypeError(
+                "Invalid trigger class: " + str(pruner_type) + "\n"
+                "Pruner trigger is supposed to be an instance of "
+                "IntervalTrigger or ManualScheduleTrigger."
+            )
+
+    @staticmethod
+    def _get_float_value(observation_value: Union[float, torch.Tensor]) -> float:
+        if isinstance(observation_value, torch.Tensor):
+            observation_value = observation_value.detach().cpu().numpy()  # type: ignore
+
+        try:
+            observation_value = float(observation_value)  # type: ignore
+        except TypeError:
+            raise TypeError(
+                "Type of observation value is not supported by ChainerPruningExtension.\n"
+                "{} cannot be cast to float.".format(type(observation_value))
+            ) from None
+
+        return observation_value
+
+    def _observation_exists(self, trainer: pytorch_trainer.training.Trainer) -> bool:
+        return (
+            self._pruner_trigger(trainer)
+            and self._observation_key in trainer.observation
+        )
+
+    def __call__(self, trainer: pytorch_trainer.training.Trainer) -> None:
+        if not self._observation_exists(trainer):
+            return
+
+        current_score = self._get_float_value(
+            trainer.observation[self._observation_key]
+        )
+        current_step = getattr(trainer.updater, self._pruner_trigger.unit)
+        self._trial.report(current_score, step=current_step)
+        if self._trial.should_prune():
+            message = "Trial was pruned at {} {}.".format(
+                self._pruner_trigger.unit, current_step
+            )
+            raise optuna.TrialPruned(message)

@@ -47,6 +47,7 @@ class TrainConfig:
     weight_initializer: Optional[str] = None
     num_processes: Optional[int] = None
     use_multithread: bool = False
+    optuna: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
