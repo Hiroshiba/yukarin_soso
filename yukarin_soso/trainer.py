@@ -1,8 +1,6 @@
 import warnings
-from copy import copy
 from functools import partial
 from pathlib import Path
-from typing import Any, Dict
 
 import torch
 import yaml
@@ -15,7 +13,11 @@ from yukarin_soso.config import Config
 from yukarin_soso.dataset import create_dataset
 from yukarin_soso.model import Model
 from yukarin_soso.network.predictor import create_predictor
-from yukarin_soso.utility.pytorch_utility import init_weights, make_optimizer
+from yukarin_soso.utility.pytorch_utility import (
+    AmpUpdater,
+    init_weights,
+    make_optimizer,
+)
 from yukarin_soso.utility.trainer_extension import TensorboardReport, WandbReport
 from yukarin_soso.utility.trainer_utility import LowValueTrigger, create_iterator
 
@@ -58,12 +60,20 @@ def create_trainer(
     optimizer = make_optimizer(config_dict=config.train.optimizer, model=model)
 
     # updater
-    updater = StandardUpdater(
-        iterator=train_iter,
-        optimizer=optimizer,
-        model=model,
-        device=device,
-    )
+    if not config.train.use_amp:
+        updater = StandardUpdater(
+            iterator=train_iter,
+            optimizer=optimizer,
+            model=model,
+            device=device,
+        )
+    else:
+        updater = AmpUpdater(
+            iterator=train_iter,
+            optimizer=optimizer,
+            model=model,
+            device=device,
+        )
 
     # trainer
     trigger_log = (config.train.log_iteration, "iteration")

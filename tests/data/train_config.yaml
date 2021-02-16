@@ -14,8 +14,10 @@ network:
   output_size: 80
   speaker_size: 100
   speaker_embedding_size: 16
-  cnn_hidden_size_list: [64, 64, 64, 64, 64, 64, 64, 64]
-  cnn_kernel_size_list: [7, 7, 7, 7, 7, 7, 7, 7]
+  cnn_type: cnn
+  cnn_hidden_size: 64
+  cnn_kernel_size: 7
+  cnn_layer_num: 8
   rnn_hidden_size: 128
   rnn_layer_num: 2
 

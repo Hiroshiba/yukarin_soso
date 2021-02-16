@@ -1,9 +1,16 @@
 from dataclasses import dataclass, field
+from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 from yukarin_soso.utility import dataclass_utility
 from yukarin_soso.utility.git_utility import get_branch_name, get_commit_id
+
+
+class CNNType(str, Enum):
+    cnn = "cnn"
+    skip_cnn = "skip_cnn"
+    residual_bottleneck_cnn = "res_bot_cnn"
 
 
 @dataclass
@@ -26,8 +33,10 @@ class NetworkConfig:
     output_size: int
     speaker_size: int
     speaker_embedding_size: int
-    cnn_hidden_size_list: List[int]
-    cnn_kernel_size_list: List[int]
+    cnn_type: str
+    cnn_hidden_size: int
+    cnn_kernel_size: int
+    cnn_layer_num: int
     rnn_hidden_size: int
     rnn_layer_num: int
 
@@ -46,6 +55,7 @@ class TrainConfig:
     optimizer: Dict[str, Any]
     weight_initializer: Optional[str] = None
     num_processes: Optional[int] = None
+    use_amp: bool = False
     use_multithread: bool = False
     optuna: Dict[str, Any] = field(default_factory=dict)
 
