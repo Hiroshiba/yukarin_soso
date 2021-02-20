@@ -40,10 +40,10 @@ class Generator(object):
         phoneme: Union[numpy.ndarray, torch.Tensor],
         speaker_id: Union[numpy.ndarray, torch.Tensor] = None,
     ):
-        f0 = to_tensor(f0)
-        phoneme = to_tensor(phoneme)
+        f0 = to_tensor(f0).to(self.device)
+        phoneme = to_tensor(phoneme).to(self.device)
         if speaker_id is not None:
-            speaker_id = to_tensor(speaker_id)
+            speaker_id = to_tensor(speaker_id).to(self.device)
 
         with torch.no_grad():
             output = self.predictor(f0=f0, phoneme=phoneme, speaker_id=speaker_id)

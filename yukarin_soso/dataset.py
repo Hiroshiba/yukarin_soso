@@ -71,6 +71,9 @@ class FeatureDataset(Dataset):
 
         length = min(len(spec_data.array), len(f0), len(phoneme), len(silence))
 
+        if sampling_length > length:
+            sampling_length = length
+
         for _ in range(10000):
             if length > sampling_length + 1:
                 offset = numpy.random.randint(length - sampling_length + 1)
