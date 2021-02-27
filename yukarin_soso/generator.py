@@ -46,5 +46,7 @@ class Generator(object):
             speaker_id = to_tensor(speaker_id).to(self.device)
 
         with torch.no_grad():
-            output = self.predictor(f0=f0, phoneme=phoneme, speaker_id=speaker_id)
+            output = self.predictor.inference(
+                f0=f0, phoneme=phoneme, speaker_id=speaker_id
+            )
         return output.cpu().numpy()

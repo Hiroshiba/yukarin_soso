@@ -11,6 +11,8 @@ from tensorboardX import SummaryWriter
 
 from yukarin_soso.config import Config
 from yukarin_soso.dataset import create_dataset
+from yukarin_soso.evaluator import GenerateEvaluator
+from yukarin_soso.generator import Generator
 from yukarin_soso.model import Model
 from yukarin_soso.network.predictor import create_predictor
 from yukarin_soso.utility.pytorch_utility import (
@@ -30,7 +32,7 @@ def create_trainer(
     config.add_git_info()
 
     output.mkdir(exist_ok=True, parents=True)
-    with (output / "config.yaml").open(mode="w") as f:
+    with output.joinpath("config.yaml").open(mode="w") as f:
         yaml.safe_dump(config.to_dict(), f)
 
     # model
@@ -53,6 +55,7 @@ def create_trainer(
     datasets = create_dataset(config.dataset)
     train_iter = _create_iterator(datasets["train"], for_train=True)
     test_iter = _create_iterator(datasets["test"], for_train=False)
+    eval_iter = _create_iterator(datasets["test"], for_train=False, for_eval=True)
 
     warnings.simplefilter("error", MultiprocessIterator.TimeoutWarning)
 
@@ -89,6 +92,17 @@ def create_trainer(
     ext = extensions.Evaluator(test_iter, model, device=device)
     trainer.extend(ext, name="test", trigger=trigger_log)
 
+    generator = Generator(
+        config=config,
+        predictor=predictor,
+        use_gpu=True,
+    )
+    generate_evaluator = GenerateEvaluator(
+        generator=generator,
+    )
+    ext = extensions.Evaluator(eval_iter, generate_evaluator, device=device)
+    trainer.extend(ext, name="eval", trigger=trigger_snapshot)
+
     ext = extensions.snapshot_object(
         predictor,
         filename="predictor_{.updater.iteration}.pth",
@@ -96,7 +110,7 @@ def create_trainer(
     )
     trainer.extend(
         ext,
-        trigger=LowValueTrigger("test/main/loss", trigger=trigger_snapshot),
+        trigger=LowValueTrigger("eval/main/mcd", trigger=trigger_snapshot),
     )
 
     trainer.extend(extensions.FailOnNonNumber(), trigger=trigger_log)

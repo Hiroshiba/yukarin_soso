@@ -39,6 +39,7 @@ class NetworkConfig:
     cnn_layer_num: int
     rnn_hidden_size: int
     rnn_layer_num: int
+    ar_hidden_size: int
 
 
 @dataclass
@@ -89,4 +90,5 @@ class Config:
 
 
 def backward_compatible(d: Dict[str, Any]):
-    pass
+    if "ar_hidden_size" not in d["network"]:
+        d["network"]["ar_hidden_size"] = 0

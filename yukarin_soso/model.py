@@ -27,6 +27,7 @@ class Model(nn.Module):
         output = self.predictor(
             f0=f0,
             phoneme=phoneme,
+            spec=spec.roll(1, dims=1),
             speaker_id=speaker_id,
         )
 
