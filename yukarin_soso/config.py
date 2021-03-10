@@ -20,6 +20,8 @@ class DatasetConfig:
     phoneme_glob: str
     spec_glob: str
     silence_glob: str
+    phoneme_list_glob: Optional[str]
+    f0_process_mode: str
     speaker_dict_path: Optional[Path]
     num_speaker: Optional[int]
     test_num: int
@@ -92,3 +94,9 @@ class Config:
 def backward_compatible(d: Dict[str, Any]):
     if "ar_hidden_size" not in d["network"]:
         d["network"]["ar_hidden_size"] = 0
+
+    if "phoneme_list_glob" not in d["dataset"]:
+        d["dataset"]["phoneme_list_glob"] = None
+
+    if "f0_process_mode" not in d["dataset"]:
+        d["dataset"]["f0_process_mode"] = "normal"

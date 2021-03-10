@@ -1,15 +1,22 @@
 import json
 from dataclasses import dataclass
+from enum import Enum
 from glob import glob
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 import numpy
+from acoustic_feature_extractor.data.phoneme import JvsPhoneme
 from acoustic_feature_extractor.data.sampling_data import SamplingData
 from torch.utils.data import ConcatDataset, Dataset
 from torch.utils.data._utils.collate import default_convert
 
 from yukarin_soso.config import DatasetConfig
+
+
+class F0ProcessMode(str, Enum):
+    normal = "normal"
+    phoneme_mean = "phoneme_mean"
 
 
 def resample(rate: float, data: SamplingData):
@@ -18,20 +25,30 @@ def resample(rate: float, data: SamplingData):
     return data.array[indexes.astype(int)]
 
 
+def f0_mean(f0: numpy.ndarray, rate: float, split_second_list: List[float]):
+    indexes = numpy.floor(numpy.array(split_second_list) * rate).astype(int)
+    for a in numpy.split(f0, indexes):
+        a[:] = numpy.mean(a[a > 0])
+    f0[numpy.isnan(f0)] = 0
+    return f0
+
+
 @dataclass
 class Input:
     f0: SamplingData
     phoneme: SamplingData
     spec: SamplingData
     silence: SamplingData
+    phoneme_list: Optional[List[JvsPhoneme]]
 
 
 @dataclass
 class LazyInput:
-    f0_path: SamplingData
-    phoneme_path: SamplingData
-    spec_path: SamplingData
-    silence_path: SamplingData
+    f0_path: Path
+    phoneme_path: Path
+    spec_path: Path
+    silence_path: Path
+    phoneme_list_path: Optional[Path]
 
     def generate(self):
         return Input(
@@ -39,6 +56,11 @@ class LazyInput:
             phoneme=SamplingData.load(self.phoneme_path),
             spec=SamplingData.load(self.spec_path),
             silence=SamplingData.load(self.silence_path),
+            phoneme_list=(
+                JvsPhoneme.load_julius_list(self.phoneme_list_path)
+                if self.phoneme_list_path is not None
+                else None
+            ),
         )
 
 
@@ -47,9 +69,11 @@ class FeatureDataset(Dataset):
         self,
         inputs: List[Union[Input, LazyInput]],
         sampling_length: int,
+        f0_process_mode: F0ProcessMode,
     ):
         self.inputs = inputs
         self.sampling_length = sampling_length
+        self.f0_process_mode = f0_process_mode
 
     @staticmethod
     def extract_input(
@@ -58,6 +82,8 @@ class FeatureDataset(Dataset):
         phoneme_data: SamplingData,
         spec_data: SamplingData,
         silence_data: SamplingData,
+        phoneme_list_data: Optional[List[JvsPhoneme]],
+        f0_process_mode: F0ProcessMode,
     ):
         rate = spec_data.rate
 
@@ -65,6 +91,16 @@ class FeatureDataset(Dataset):
         phoneme = resample(rate=rate, data=phoneme_data)
         silence = resample(rate=rate, data=silence_data)
         spec = spec_data.array
+
+        if f0_process_mode == F0ProcessMode.normal:
+            pass
+        elif f0_process_mode == F0ProcessMode.phoneme_mean:
+            assert phoneme_list_data is not None
+            f0 = f0_mean(
+                f0=f0,
+                rate=rate,
+                split_second_list=[p.end for p in phoneme_list_data[:-1]],
+            )
 
         assert numpy.abs(len(spec) - len(f0)) < 5
         assert numpy.abs(len(spec) - len(phoneme)) < 5
@@ -129,6 +165,8 @@ class FeatureDataset(Dataset):
             phoneme_data=input.phoneme,
             spec_data=input.spec,
             silence_data=input.silence,
+            phoneme_list_data=input.phoneme_list,
+            f0_process_mode=self.f0_process_mode,
         )
 
 
@@ -172,6 +210,14 @@ def create_dataset(config: DatasetConfig):
     silence_paths = {Path(p).stem: Path(p) for p in glob(config.silence_glob)}
     assert set(fn_list) == set(silence_paths.keys())
 
+    phoneme_list_paths: Optional[Dict[str, Path]] = None
+    if config.phoneme_list_glob is not None:
+        phoneme_list_paths = {
+            Path(p).stem: Path(p) for p in glob(config.phoneme_list_glob)
+        }
+        fn_list = sorted(phoneme_list_paths.keys())
+        assert len(fn_list) > 0
+
     speaker_ids: Optional[Dict[str, int]] = None
     if config.speaker_dict_path is not None:
         fn_each_speaker: Dict[str, List[str]] = json.loads(
@@ -199,6 +245,9 @@ def create_dataset(config: DatasetConfig):
                 phoneme_path=phoneme_paths[fn],
                 spec_path=spec_paths[fn],
                 silence_path=silence_paths[fn],
+                phoneme_list_path=(
+                    phoneme_list_paths[fn] if phoneme_list_paths is not None else None
+                ),
             )
             for fn in fns
         ]
@@ -206,6 +255,7 @@ def create_dataset(config: DatasetConfig):
         dataset = FeatureDataset(
             inputs=inputs,
             sampling_length=config.sampling_length,
+            f0_process_mode=F0ProcessMode(config.f0_process_mode),
         )
 
         if speaker_ids is not None:

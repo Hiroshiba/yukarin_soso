@@ -4,6 +4,8 @@ dataset:
   phoneme_glob: "/path/to/phoneme/*.npy"
   spec_glob: "/path/to/spec/*.npy"
   silence_glob: "/path/to/silence/*.npy"
+  phoneme_list_glob: "/path/to/phoneme_list/*.lab"
+  f0_process_mode: normal
   speaker_dict_path: "/path/to/speaker_dict_path.json"
   num_speaker: 100
   test_num: 100
