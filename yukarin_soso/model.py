@@ -1,5 +1,6 @@
 from typing import Optional
 
+import torch
 import torch.nn.functional as F
 from pytorch_trainer import report
 from torch import Tensor, nn
@@ -20,6 +21,7 @@ class Model(nn.Module):
         phoneme: Tensor,
         spec: Tensor,
         silence: Tensor,
+        padded: Tensor,
         speaker_id: Optional[Tensor] = None,
     ):
         batch_size = spec.shape[0]
@@ -32,14 +34,19 @@ class Model(nn.Module):
         )
 
         loss = F.l1_loss(input=output, target=spec, reduction="none")
+
+        mask = padded
         if self.model_config.eliminate_silence:
-            loss = loss[~silence]
+            mask = torch.logical_or(mask, silence)
+        loss = loss[~mask]
+
         loss = loss.mean()
 
         # report
         losses = dict(loss=loss)
         if not self.training:
-            losses = {key: (l, batch_size) for key, l in losses.items()}
+            weight = (~mask).to(torch.float32).mean() * batch_size
+            losses = {key: (l, weight) for key, l in losses.items()}
         report(losses, self)
 
         return loss

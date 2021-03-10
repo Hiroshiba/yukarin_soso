@@ -83,7 +83,7 @@ class Predictor(nn.Module):
     ):
         feature = torch.cat((f0, phoneme), dim=2)  # (batch_size, length, ?)
 
-        if self.speaker_embedder is not None:
+        if self.speaker_embedder is not None and speaker_id is not None:
             speaker_id = self.speaker_embedder(speaker_id)
             speaker_id = speaker_id.unsqueeze(dim=1)  # (batch_size, 1, ?)
             speaker_feature = speaker_id.expand(
@@ -122,7 +122,7 @@ class Predictor(nn.Module):
         phoneme: Tensor,
         speaker_id: Optional[Tensor],
     ):
-        batch_size = len(phoneme)
+        batch_size = phoneme.shape[0]
 
         h = self.forward_encoder(
             f0=f0,

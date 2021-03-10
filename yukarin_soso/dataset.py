@@ -64,15 +64,19 @@ class FeatureDataset(Dataset):
         f0 = resample(rate=rate, data=f0_data)
         phoneme = resample(rate=rate, data=phoneme_data)
         silence = resample(rate=rate, data=silence_data)
+        spec = spec_data.array
 
-        assert numpy.abs(len(spec_data.array) - len(f0)) < 5
-        assert numpy.abs(len(spec_data.array) - len(phoneme)) < 5
-        assert numpy.abs(len(spec_data.array) - len(silence)) < 5
+        assert numpy.abs(len(spec) - len(f0)) < 5
+        assert numpy.abs(len(spec) - len(phoneme)) < 5
+        assert numpy.abs(len(spec) - len(silence)) < 5
 
-        length = min(len(spec_data.array), len(f0), len(phoneme), len(silence))
+        length = min(len(spec), len(f0), len(phoneme), len(silence))
 
         if sampling_length > length:
+            padding_length = sampling_length - length
             sampling_length = length
+        else:
+            padding_length = 0
 
         for _ in range(10000):
             if length > sampling_length + 1:
@@ -88,13 +92,27 @@ class FeatureDataset(Dataset):
         if silence.ndim == 2:
             silence = numpy.squeeze(silence, axis=1)
 
+        f0 = f0[offset : offset + sampling_length]
+        phoneme = phoneme[offset : offset + sampling_length]
+        spec = spec[offset : offset + sampling_length]
+        silence = silence[offset : offset + sampling_length]
+        padded = numpy.zeros_like(silence)
+
+        if padding_length > 0:
+            pre = numpy.random.randint(padding_length + 1)
+            post = padding_length - pre
+            f0 = numpy.pad(f0, [[pre, post], [0, 0]])
+            phoneme = numpy.pad(phoneme, [[pre, post], [0, 0]])
+            spec = numpy.pad(spec, [[pre, post], [0, 0]])
+            silence = numpy.pad(silence, [pre, post], constant_values=True)
+            padded = numpy.pad(padded, [pre, post], constant_values=True)
+
         return dict(
-            f0=f0[offset : offset + sampling_length].astype(numpy.float32),
-            phoneme=phoneme[offset : offset + sampling_length].astype(numpy.float32),
-            spec=spec_data.array[offset : offset + sampling_length].astype(
-                numpy.float32
-            ),
-            silence=silence[offset : offset + sampling_length],
+            f0=f0.astype(numpy.float32),
+            phoneme=phoneme.astype(numpy.float32),
+            spec=spec.astype(numpy.float32),
+            silence=silence,
+            padded=padded,
         )
 
     def __len__(self):

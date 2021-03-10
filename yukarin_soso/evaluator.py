@@ -29,20 +29,26 @@ class GenerateEvaluator(nn.Module):
         phoneme: Tensor,
         spec: Tensor,
         silence: Tensor,
+        padded: Tensor,
         speaker_id: Optional[Tensor] = None,
     ):
         batch_size = len(spec)
+        numpy_padded = padded.cpu().numpy()
 
         out_spec = self.generator.generate(
             f0=f0,
             phoneme=phoneme,
             speaker_id=speaker_id,
         )
-        in_spec = spec.cpu().numpy()
+        out_spec = out_spec[~numpy_padded]
+
+        in_spec = spec.cpu().numpy()[~numpy_padded]
 
         diff = numpy.abs(out_spec - in_spec).mean()
         mcd = _mcd(out_spec, in_spec)
-        scores = {"diff": (diff, batch_size), "mcd": (mcd, batch_size)}
+
+        weight = (~numpy_padded).mean() * batch_size
+        scores = {"diff": (diff, weight), "mcd": (mcd, weight)}
 
         report(scores, self)
         return scores
