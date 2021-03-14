@@ -9,7 +9,7 @@ dataset:
   speaker_dict_path: "/path/to/speaker_dict_path.json"
   num_speaker: 100
   test_num: 100
-  test_trial_num: 5
+  test_trial_num: 10
 
 network:
   input_feature_size: 40
@@ -35,7 +35,10 @@ train:
     name: "adam"
     lr: 3.0e-4
   weight_initializer: "orthogonal"
+  use_amp: true
+  use_multithread: false
 
 project:
   name: null
   tags: {}
+  category: null
