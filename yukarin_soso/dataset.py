@@ -13,10 +13,13 @@ from torch.utils.data._utils.collate import default_convert
 
 from yukarin_soso.config import DatasetConfig
 
+mora_phoneme_list = ["a", "i", "u", "e", "o", "A", "I", "U", "E", "O", "N", "cl", "pau"]
+
 
 class F0ProcessMode(str, Enum):
     normal = "normal"
     phoneme_mean = "phoneme_mean"
+    mora_mean = "mora_mean"
 
 
 def resample(rate: float, data: SamplingData):
@@ -97,12 +100,23 @@ class FeatureDataset(Dataset):
 
         if f0_process_mode == F0ProcessMode.normal:
             pass
-        elif f0_process_mode == F0ProcessMode.phoneme_mean:
+        elif (
+            f0_process_mode == F0ProcessMode.phoneme_mean
+            or f0_process_mode == F0ProcessMode.mora_mean
+        ):
             assert phoneme_list_data is not None
+            if f0_process_mode == F0ProcessMode.phoneme_mean:
+                split_second_list = [p.end for p in phoneme_list_data[:-1]]
+            else:
+                split_second_list = [
+                    p.end
+                    for p in phoneme_list_data[:-1]
+                    if p.phoneme in mora_phoneme_list
+                ]
             f0 = f0_mean(
                 f0=f0,
                 rate=rate,
-                split_second_list=[p.end for p in phoneme_list_data[:-1]],
+                split_second_list=split_second_list,
             )
 
         assert numpy.abs(len(spec) - len(f0)) < 5

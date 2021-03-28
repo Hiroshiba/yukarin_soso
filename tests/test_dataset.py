@@ -144,7 +144,12 @@ def test_extract_input():
 
 @pytest.mark.parametrize(
     "sampling_length,f0_process_mode,time_mask_max_second",
-    [(256, F0ProcessMode.normal, 0.1), (256, F0ProcessMode.phoneme_mean, 0.1)],
+    [
+        (256, F0ProcessMode.normal, 0),
+        (256, F0ProcessMode.phoneme_mean, 0),
+        (256, F0ProcessMode.mora_mean, 0),
+        (256, F0ProcessMode.normal, 0.5),
+    ],
 )
 def test_extract_input_with_dataset(
     sampling_length: int,
