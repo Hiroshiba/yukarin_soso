@@ -22,6 +22,7 @@ class DatasetConfig:
     silence_glob: str
     phoneme_list_glob: Optional[str]
     f0_process_mode: str
+    time_mask_max_second: float
     speaker_dict_path: Optional[Path]
     num_speaker: Optional[int]
     test_num: int
@@ -100,3 +101,6 @@ def backward_compatible(d: Dict[str, Any]):
 
     if "f0_process_mode" not in d["dataset"]:
         d["dataset"]["f0_process_mode"] = "normal"
+
+    if "time_mask_max_second" not in d["dataset"]:
+        d["dataset"]["time_mask_max_second"] = 0

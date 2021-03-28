@@ -112,17 +112,23 @@ def test_extract_input():
     spec_rate = wave_rate / 256
     silence_rate = 24000
 
-    f0 = numpy.arange(int(second * f0_rate)).astype(numpy.float32)
+    f0 = numpy.arange(int(second * f0_rate)).reshape(-1, 1).astype(numpy.float32)
     f0_data = SamplingData(array=f0, rate=f0_rate)
 
-    phoneme = numpy.arange(int(second * phoneme_rate)).astype(numpy.float32)
+    phoneme = (
+        numpy.arange(int(second * phoneme_rate)).reshape(-1, 1).astype(numpy.float32)
+    )
     phoneme_data = SamplingData(array=phoneme, rate=phoneme_rate)
 
-    spec = numpy.arange(int(second * spec_rate)).astype(numpy.float32)
+    spec = numpy.arange(int(second * spec_rate)).reshape(-1, 1).astype(numpy.float32)
     spec_data = SamplingData(array=spec, rate=spec_rate)
 
     silence = numpy.zeros(int(second * silence_rate)).astype(bool)
     silence_data = SamplingData(array=silence, rate=silence_rate)
+
+    phoneme_list_data = None
+    f0_process_mode = F0ProcessMode.normal
+    time_mask_max_second = 0
 
     output = FeatureDataset.extract_input(
         sampling_length=sampling_length,
@@ -130,12 +136,15 @@ def test_extract_input():
         phoneme_data=phoneme_data,
         spec_data=spec_data,
         silence_data=silence_data,
+        phoneme_list_data=phoneme_list_data,
+        f0_process_mode=f0_process_mode,
+        time_mask_max_second=time_mask_max_second,
     )
 
 
 @pytest.mark.parametrize(
-    "sampling_length,f0_process_mode",
-    [(256, F0ProcessMode.normal), (256, F0ProcessMode.phoneme_mean)],
+    "sampling_length,f0_process_mode,time_mask_max_second",
+    [(256, F0ProcessMode.normal, 0.1), (256, F0ProcessMode.phoneme_mean, 0.1)],
 )
 def test_extract_input_with_dataset(
     sampling_length: int,
@@ -145,14 +154,13 @@ def test_extract_input_with_dataset(
     silence_path: Path,
     spectrogram_path: Path,
     f0_process_mode: F0ProcessMode,
+    time_mask_max_second: float,
 ):
     f0 = SamplingData.load(f0_path)
     phoneme = SamplingData.load(phoneme_path)
     phoneme_list = JvsPhoneme.load_julius_list(phoneme_list_path)
     silence = SamplingData.load(silence_path)
     spectrogram = SamplingData.load(spectrogram_path)
-
-    sampling_length = 256
 
     FeatureDataset.extract_input(
         sampling_length=sampling_length,
@@ -162,4 +170,5 @@ def test_extract_input_with_dataset(
         silence_data=silence,
         phoneme_list_data=phoneme_list,
         f0_process_mode=f0_process_mode,
+        time_mask_max_second=time_mask_max_second,
     )
