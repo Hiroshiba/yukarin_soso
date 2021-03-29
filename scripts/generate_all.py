@@ -8,7 +8,12 @@ import yaml
 from tqdm import tqdm
 from utility.save_arguments import save_arguments
 from yukarin_soso.config import Config
-from yukarin_soso.dataset import FeatureDataset, SpeakerFeatureDataset, create_dataset
+from yukarin_soso.dataset import (
+    F0ProcessMode,
+    FeatureDataset,
+    SpeakerFeatureDataset,
+    create_dataset,
+)
 from yukarin_soso.generator import Generator
 
 
@@ -74,11 +79,14 @@ def generate_all(
     ):
         input_data = input.generate()
         data = FeatureDataset.extract_input(
-            sampling_length=numpy.inf,
+            sampling_length=len(input_data.spec.array),
             f0_data=input_data.f0,
             phoneme_data=input_data.phoneme,
             spec_data=input_data.spec,
             silence_data=input_data.silence,
+            phoneme_list_data=input_data.phoneme_list,
+            f0_process_mode=F0ProcessMode(config.dataset.f0_process_mode),
+            time_mask_max_second=0,
         )
 
         spec = generator.generate(
