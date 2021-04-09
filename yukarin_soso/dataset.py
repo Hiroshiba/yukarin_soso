@@ -74,11 +74,13 @@ class FeatureDataset(Dataset):
         sampling_length: int,
         f0_process_mode: F0ProcessMode,
         time_mask_max_second: float,
+        time_mask_num: int,
     ):
         self.inputs = inputs
         self.sampling_length = sampling_length
         self.f0_process_mode = f0_process_mode
         self.time_mask_max_second = time_mask_max_second
+        self.time_mask_num = time_mask_num
 
     @staticmethod
     def extract_input(
@@ -90,6 +92,7 @@ class FeatureDataset(Dataset):
         phoneme_list_data: Optional[List[JvsPhoneme]],
         f0_process_mode: F0ProcessMode,
         time_mask_max_second: float,
+        time_mask_num: int,
     ):
         rate = spec_data.rate
 
@@ -160,11 +163,12 @@ class FeatureDataset(Dataset):
             silence = numpy.pad(silence, [pre, post], constant_values=True)
             padded = numpy.pad(padded, [pre, post], constant_values=True)
 
-        if time_mask_max_second > 0:
-            mask_length = numpy.random.randint(int(rate * time_mask_max_second))
-            mask_offset = numpy.random.randint(len(f0) - mask_length + 1)
-            f0[mask_offset : mask_offset + mask_length] = 0
-            phoneme[mask_offset : mask_offset + mask_length] = 0
+        if time_mask_max_second > 0 and time_mask_num > 0:
+            for _ in range(time_mask_num):
+                mask_length = numpy.random.randint(int(rate * time_mask_max_second))
+                mask_offset = numpy.random.randint(len(f0) - mask_length + 1)
+                f0[mask_offset : mask_offset + mask_length] = 0
+                phoneme[mask_offset : mask_offset + mask_length] = 0
 
         return dict(
             f0=f0.astype(numpy.float32),
@@ -191,6 +195,7 @@ class FeatureDataset(Dataset):
             phoneme_list_data=input.phoneme_list,
             f0_process_mode=self.f0_process_mode,
             time_mask_max_second=self.time_mask_max_second,
+            time_mask_num=self.time_mask_num,
         )
 
 
@@ -281,6 +286,7 @@ def create_dataset(config: DatasetConfig):
             sampling_length=config.sampling_length,
             f0_process_mode=F0ProcessMode(config.f0_process_mode),
             time_mask_max_second=(config.time_mask_max_second if not for_test else 0),
+            time_mask_num=(config.time_mask_num if not for_test else 0),
         )
 
         if speaker_ids is not None:

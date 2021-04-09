@@ -23,6 +23,7 @@ class DatasetConfig:
     phoneme_list_glob: Optional[str]
     f0_process_mode: str
     time_mask_max_second: float
+    time_mask_num: int
     speaker_dict_path: Optional[Path]
     num_speaker: Optional[int]
     test_num: int
@@ -104,3 +105,6 @@ def backward_compatible(d: Dict[str, Any]):
 
     if "time_mask_max_second" not in d["dataset"]:
         d["dataset"]["time_mask_max_second"] = 0
+
+    if "time_mask_num" not in d["dataset"]:
+        d["dataset"]["time_mask_num"] = 0
