@@ -21,6 +21,7 @@ class DatasetConfig:
     spec_glob: str
     silence_glob: str
     phoneme_list_glob: Optional[str]
+    volume_glob: Optional[str]
     f0_process_mode: str
     time_mask_max_second: float
     time_mask_num: int
@@ -112,3 +113,6 @@ def backward_compatible(d: Dict[str, Any]):
 
     if "eval_iteration" not in d["train"]:
         d["train"]["eval_iteration"] = 0
+
+    if "volume_glob" not in d["dataset"]:
+        d["dataset"]["volume_glob"] = None

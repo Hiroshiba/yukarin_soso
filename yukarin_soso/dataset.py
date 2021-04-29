@@ -14,24 +14,33 @@ from torch.utils.data._utils.collate import default_convert
 from yukarin_soso.config import DatasetConfig
 
 mora_phoneme_list = ["a", "i", "u", "e", "o", "A", "I", "U", "E", "O", "N", "cl", "pau"]
+voiced_phoneme_list = (
+    ["a", "i", "u", "e", "o", "N"]
+    + ["n", "m", "y", "r", "w", "g", "z", "j", "d", "b"]
+    + ["ny", "my", "ry", "gy", "by"]
+)
 
 
 class F0ProcessMode(str, Enum):
     normal = "normal"
     phoneme_mean = "phoneme_mean"
     mora_mean = "mora_mean"
+    voiced_mora_mean = "voiced_mora_mean"
 
 
-def resample(rate: float, data: SamplingData):
-    length = int(len(data.array) / data.rate * rate)
-    indexes = (numpy.random.rand() + numpy.arange(length)) * (data.rate / rate)
-    return data.array[indexes.astype(int)]
-
-
-def f0_mean(f0: numpy.ndarray, rate: float, split_second_list: List[float]):
+def f0_mean(
+    f0: numpy.ndarray,
+    rate: float,
+    split_second_list: List[float],
+    weight: Optional[numpy.ndarray],
+):
     indexes = numpy.floor(numpy.array(split_second_list) * rate).astype(int)
-    for a in numpy.split(f0, indexes):
-        a[:] = numpy.mean(a[a > 0])
+    if weight is None:
+        for a in numpy.split(f0, indexes):
+            a[:] = numpy.mean(a[a > 0])
+    else:
+        for a, b in zip(numpy.split(f0, indexes), numpy.split(weight, indexes)):
+            a[:] = numpy.sum(a[a > 0] * b[a > 0]) / numpy.sum(b[a > 0])
     f0[numpy.isnan(f0)] = 0
     return f0
 
@@ -43,6 +52,7 @@ class Input:
     spec: SamplingData
     silence: SamplingData
     phoneme_list: Optional[List[JvsPhoneme]]
+    volume: Optional[SamplingData]
 
 
 @dataclass
@@ -52,6 +62,7 @@ class LazyInput:
     spec_path: Path
     silence_path: Path
     phoneme_list_path: Optional[Path]
+    volume_path: Optional[Path]
 
     def generate(self):
         return Input(
@@ -62,6 +73,11 @@ class LazyInput:
             phoneme_list=(
                 JvsPhoneme.load_julius_list(self.phoneme_list_path)
                 if self.phoneme_list_path is not None
+                else None
+            ),
+            volume=(
+                SamplingData.load(self.volume_path)
+                if self.volume_path is not None
                 else None
             ),
         )
@@ -90,24 +106,34 @@ class FeatureDataset(Dataset):
         spec_data: SamplingData,
         silence_data: SamplingData,
         phoneme_list_data: Optional[List[JvsPhoneme]],
+        volume_data: Optional[SamplingData],
         f0_process_mode: F0ProcessMode,
         time_mask_max_second: float,
         time_mask_num: int,
     ):
         rate = spec_data.rate
 
-        f0 = resample(rate=rate, data=f0_data)
-        phoneme = resample(rate=rate, data=phoneme_data)
-        silence = resample(rate=rate, data=silence_data)
+        f0 = f0_data.resample(rate)
+        phoneme = phoneme_data.resample(rate)
+        silence = silence_data.resample(rate)
+        volume = volume_data.resample(rate) if volume_data is not None else None
         spec = spec_data.array
+
+        assert numpy.abs(len(spec) - len(f0)) < 5
+        assert numpy.abs(len(spec) - len(phoneme)) < 5
+        assert numpy.abs(len(spec) - len(silence)) < 5
+        assert volume is None or numpy.abs(len(spec) - len(silence)) < 5
+
+        length = min(len(spec), len(f0), len(phoneme), len(silence))
+        if volume is not None:
+            length = min(length, len(volume))
 
         if f0_process_mode == F0ProcessMode.normal:
             pass
-        elif (
-            f0_process_mode == F0ProcessMode.phoneme_mean
-            or f0_process_mode == F0ProcessMode.mora_mean
-        ):
+        else:
             assert phoneme_list_data is not None
+            weight = volume
+
             if f0_process_mode == F0ProcessMode.phoneme_mean:
                 split_second_list = [p.end for p in phoneme_list_data[:-1]]
             else:
@@ -116,17 +142,24 @@ class FeatureDataset(Dataset):
                     for p in phoneme_list_data[:-1]
                     if p.phoneme in mora_phoneme_list
                 ]
+
+            if f0_process_mode == F0ProcessMode.voiced_mora_mean:
+                if weight is None:
+                    weight = numpy.ones_like(f0)
+
+                for p in phoneme_list_data:
+                    if p.phoneme not in voiced_phoneme_list:
+                        weight[int(p.start * rate) : int(p.end * rate)] = 0
+
+            f0 = f0[:length]
+            weight = weight[:length]
+
             f0 = f0_mean(
                 f0=f0,
                 rate=rate,
                 split_second_list=split_second_list,
+                weight=weight,
             )
-
-        assert numpy.abs(len(spec) - len(f0)) < 5
-        assert numpy.abs(len(spec) - len(phoneme)) < 5
-        assert numpy.abs(len(spec) - len(silence)) < 5
-
-        length = min(len(spec), len(f0), len(phoneme), len(silence))
 
         if sampling_length > length:
             padding_length = sampling_length - length
@@ -193,6 +226,7 @@ class FeatureDataset(Dataset):
             spec_data=input.spec,
             silence_data=input.silence,
             phoneme_list_data=input.phoneme_list,
+            volume_data=input.volume,
             f0_process_mode=self.f0_process_mode,
             time_mask_max_second=self.time_mask_max_second,
             time_mask_num=self.time_mask_num,
@@ -247,6 +281,12 @@ def create_dataset(config: DatasetConfig):
         fn_list = sorted(phoneme_list_paths.keys())
         assert len(fn_list) > 0
 
+    volume_paths: Optional[Dict[str, Path]] = None
+    if config.volume_glob is not None:
+        volume_paths = {Path(p).stem: Path(p) for p in glob(config.volume_glob)}
+        fn_list = sorted(volume_paths.keys())
+        assert len(fn_list) > 0
+
     speaker_ids: Optional[Dict[str, int]] = None
     if config.speaker_dict_path is not None:
         fn_each_speaker: Dict[str, List[str]] = json.loads(
@@ -277,6 +317,7 @@ def create_dataset(config: DatasetConfig):
                 phoneme_list_path=(
                     phoneme_list_paths[fn] if phoneme_list_paths is not None else None
                 ),
+                volume_path=volume_paths[fn] if volume_paths is not None else None,
             )
             for fn in fns
         ]
