@@ -80,6 +80,7 @@ def create_trainer(
 
     # trainer
     trigger_log = (config.train.log_iteration, "iteration")
+    trigger_eval = (config.train.eval_iteration, "iteration")
     trigger_snapshot = (config.train.snapshot_iteration, "iteration")
     trigger_stop = (
         (config.train.stop_iteration, "iteration")
@@ -101,7 +102,7 @@ def create_trainer(
         generator=generator,
     )
     ext = extensions.Evaluator(eval_iter, generate_evaluator, device=device)
-    trainer.extend(ext, name="eval", trigger=trigger_snapshot)
+    trainer.extend(ext, name="eval", trigger=trigger_eval)
 
     ext = extensions.snapshot_object(
         predictor,
@@ -110,7 +111,7 @@ def create_trainer(
     )
     trainer.extend(
         ext,
-        trigger=LowValueTrigger("eval/main/mcd", trigger=trigger_snapshot),
+        trigger=LowValueTrigger("eval/main/mcd", trigger=trigger_eval),
     )
 
     trainer.extend(extensions.FailOnNonNumber(), trigger=trigger_log)

@@ -55,6 +55,7 @@ class ModelConfig:
 class TrainConfig:
     batch_size: int
     log_iteration: int
+    eval_iteration: int
     snapshot_iteration: int
     stop_iteration: int
     optimizer: Dict[str, Any]
@@ -108,3 +109,6 @@ def backward_compatible(d: Dict[str, Any]):
 
     if "time_mask_num" not in d["dataset"]:
         d["dataset"]["time_mask_num"] = 0
+
+    if "eval_iteration" not in d["train"]:
+        d["train"]["eval_iteration"] = 0
