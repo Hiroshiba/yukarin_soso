@@ -248,6 +248,34 @@ class SpeakerFeatureDataset(Dataset):
         return d
 
 
+class UnbalancedSpeakerFeatureDataset(SpeakerFeatureDataset):
+    def __init__(
+        self,
+        dataset: FeatureDataset,
+        speaker_ids: List[int],
+        weighted_speaker_id: int,
+        weight: int,
+    ):
+        super().__init__(dataset=dataset, speaker_ids=speaker_ids)
+
+        self.weighted_indexes = [
+            i
+            for i, speaker_id in enumerate(speaker_ids)
+            if speaker_id == weighted_speaker_id
+        ]
+        self.weight = weight
+
+    def __len__(self):
+        return super().__len__() + len(self.weighted_indexes) * (self.weight - 1)
+
+    def __getitem__(self, i):
+        if i >= super().__len__():
+            i = self.weighted_indexes[
+                (i - super().__len__()) % len(self.weighted_indexes)
+            ]
+        return super().__getitem__(i)
+
+
 class TensorWrapperDataset(Dataset):
     def __init__(self, dataset: Dataset):
         self.dataset = dataset
@@ -331,10 +359,18 @@ def create_dataset(config: DatasetConfig):
         )
 
         if speaker_ids is not None:
-            dataset = SpeakerFeatureDataset(
-                dataset=dataset,
-                speaker_ids=[speaker_ids[fn] for fn in fns],
-            )
+            if config.weighted_speaker_id is None:
+                dataset = SpeakerFeatureDataset(
+                    dataset=dataset,
+                    speaker_ids=[speaker_ids[fn] for fn in fns],
+                )
+            else:
+                dataset = UnbalancedSpeakerFeatureDataset(
+                    dataset=dataset,
+                    speaker_ids=[speaker_ids[fn] for fn in fns],
+                    weighted_speaker_id=config.weighted_speaker_id,
+                    weight=config.speaker_weight,
+                )
 
         dataset = TensorWrapperDataset(dataset)
 

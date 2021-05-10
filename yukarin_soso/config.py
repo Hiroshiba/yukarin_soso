@@ -27,6 +27,8 @@ class DatasetConfig:
     time_mask_num: int
     speaker_dict_path: Optional[Path]
     num_speaker: Optional[int]
+    weighted_speaker_id: Optional[int]
+    speaker_weight: Optional[int]
     test_num: int
     test_trial_num: int = 1
     seed: int = 0
@@ -116,3 +118,8 @@ def backward_compatible(d: Dict[str, Any]):
 
     if "volume_glob" not in d["dataset"]:
         d["dataset"]["volume_glob"] = None
+
+    if "weighted_speaker_id" not in d["dataset"]:
+        d["dtaset"]["weighted_speaker_id"] = None
+    if "speaker_weight" not in d["dataset"]:
+        d["dtaset"]["speaker_weight"] = None
