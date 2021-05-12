@@ -120,6 +120,6 @@ def backward_compatible(d: Dict[str, Any]):
         d["dataset"]["volume_glob"] = None
 
     if "weighted_speaker_id" not in d["dataset"]:
-        d["dtaset"]["weighted_speaker_id"] = None
+        d["dataset"]["weighted_speaker_id"] = None
     if "speaker_weight" not in d["dataset"]:
-        d["dtaset"]["speaker_weight"] = None
+        d["dataset"]["speaker_weight"] = None
