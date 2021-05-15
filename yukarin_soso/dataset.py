@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from enum import Enum
 from glob import glob
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Sequence, Union
 
 import numpy
 from acoustic_feature_extractor.data.phoneme import JvsPhoneme
@@ -86,7 +86,7 @@ class LazyInput:
 class FeatureDataset(Dataset):
     def __init__(
         self,
-        inputs: List[Union[Input, LazyInput]],
+        inputs: Sequence[Union[Input, LazyInput]],
         sampling_length: int,
         f0_process_mode: F0ProcessMode,
         time_mask_max_second: float,
@@ -359,7 +359,7 @@ def create_dataset(config: DatasetConfig):
         )
 
         if speaker_ids is not None:
-            if config.weighted_speaker_id is None:
+            if config.weighted_speaker_id is None or config.speaker_weight is None:
                 dataset = SpeakerFeatureDataset(
                     dataset=dataset,
                     speaker_ids=[speaker_ids[fn] for fn in fns],
@@ -379,7 +379,104 @@ def create_dataset(config: DatasetConfig):
 
         return dataset
 
+    valid_dataset = (
+        create_validation_dataset(config) if config.valid_num is not None else None
+    )
+
     return {
         "train": _dataset(trains),
         "test": _dataset(tests, for_test=True),
+        "valid": valid_dataset,
     }
+
+
+def create_validation_dataset(config: DatasetConfig):
+    assert config.valid_f0_glob is not None
+    assert config.valid_phoneme_glob is not None
+    assert config.valid_spec_glob is not None
+    assert config.valid_silence_glob is not None
+    assert config.valid_trial_num is not None
+
+    f0_paths = {Path(p).stem: Path(p) for p in glob(config.valid_f0_glob)}
+    fn_list = sorted(f0_paths.keys())
+    assert len(fn_list) > 0
+
+    phoneme_paths = {Path(p).stem: Path(p) for p in glob(config.valid_phoneme_glob)}
+    assert set(fn_list) == set(phoneme_paths.keys())
+
+    spec_paths = {Path(p).stem: Path(p) for p in glob(config.valid_spec_glob)}
+    assert set(fn_list) == set(spec_paths.keys())
+
+    silence_paths = {Path(p).stem: Path(p) for p in glob(config.valid_silence_glob)}
+    assert set(fn_list) == set(silence_paths.keys())
+
+    phoneme_list_paths: Optional[Dict[str, Path]] = None
+    if config.valid_phoneme_list_glob is not None:
+        phoneme_list_paths = {
+            Path(p).stem: Path(p) for p in glob(config.valid_phoneme_list_glob)
+        }
+        fn_list = sorted(phoneme_list_paths.keys())
+        assert len(fn_list) > 0
+
+    volume_paths: Optional[Dict[str, Path]] = None
+    if config.valid_volume_glob is not None:
+        volume_paths = {Path(p).stem: Path(p) for p in glob(config.valid_volume_glob)}
+        fn_list = sorted(volume_paths.keys())
+        assert len(fn_list) > 0
+
+    speaker_ids: Optional[Dict[str, int]] = None
+    if config.valid_speaker_dict_path is not None:
+        fn_each_speaker: Dict[str, List[str]] = json.loads(
+            config.valid_speaker_dict_path.read_text()
+        )
+
+        speaker_ids = {
+            fn: speaker_id
+            for speaker_id, (_, fns) in enumerate(fn_each_speaker.items())
+            for fn in fns
+        }
+        assert set(fn_list).issubset(set(speaker_ids.keys()))
+
+    numpy.random.RandomState(config.seed).shuffle(fn_list)
+
+    valids = fn_list[: config.valid_num]
+
+    inputs = [
+        LazyInput(
+            f0_path=f0_paths[fn],
+            phoneme_path=phoneme_paths[fn],
+            spec_path=spec_paths[fn],
+            silence_path=silence_paths[fn],
+            phoneme_list_path=(
+                phoneme_list_paths[fn] if phoneme_list_paths is not None else None
+            ),
+            volume_path=volume_paths[fn] if volume_paths is not None else None,
+        )
+        for fn in valids
+    ]
+
+    dataset = FeatureDataset(
+        inputs=inputs,
+        sampling_length=config.sampling_length,
+        f0_process_mode=F0ProcessMode(config.f0_process_mode),
+        time_mask_max_second=0,
+        time_mask_num=0,
+    )
+
+    if speaker_ids is not None:
+        if config.weighted_speaker_id is None or config.speaker_weight is None:
+            dataset = SpeakerFeatureDataset(
+                dataset=dataset,
+                speaker_ids=[speaker_ids[fn] for fn in valids],
+            )
+        else:
+            dataset = UnbalancedSpeakerFeatureDataset(
+                dataset=dataset,
+                speaker_ids=[speaker_ids[fn] for fn in valids],
+                weighted_speaker_id=config.weighted_speaker_id,
+                weight=config.speaker_weight,
+            )
+
+    dataset = TensorWrapperDataset(dataset)
+    dataset = ConcatDataset([dataset] * config.valid_trial_num)
+    return dataset

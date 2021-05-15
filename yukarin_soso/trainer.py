@@ -57,6 +57,10 @@ def create_trainer(
     test_iter = _create_iterator(datasets["test"], for_train=False)
     eval_iter = _create_iterator(datasets["test"], for_train=False, for_eval=True)
 
+    valid_iter = None
+    if datasets["valid"] is not None:
+        valid_iter = _create_iterator(datasets["valid"], for_train=False, for_eval=True)
+
     warnings.simplefilter("error", MultiprocessIterator.TimeoutWarning)
 
     # optimizer
@@ -93,16 +97,13 @@ def create_trainer(
     ext = extensions.Evaluator(test_iter, model, device=device)
     trainer.extend(ext, name="test", trigger=trigger_log)
 
-    generator = Generator(
-        config=config,
-        predictor=predictor,
-        use_gpu=True,
-    )
-    generate_evaluator = GenerateEvaluator(
-        generator=generator,
-    )
+    generator = Generator(config=config, predictor=predictor, use_gpu=True)
+    generate_evaluator = GenerateEvaluator(generator=generator)
     ext = extensions.Evaluator(eval_iter, generate_evaluator, device=device)
     trainer.extend(ext, name="eval", trigger=trigger_eval)
+    if valid_iter is not None:
+        ext = extensions.Evaluator(valid_iter, generate_evaluator, device=device)
+        trainer.extend(ext, name="valid", trigger=trigger_eval)
 
     ext = extensions.snapshot_object(
         predictor,

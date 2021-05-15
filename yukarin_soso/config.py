@@ -31,6 +31,15 @@ class DatasetConfig:
     speaker_weight: Optional[int]
     test_num: int
     test_trial_num: int = 1
+    valid_f0_glob: Optional[str] = None
+    valid_phoneme_glob: Optional[str] = None
+    valid_spec_glob: Optional[str] = None
+    valid_silence_glob: Optional[str] = None
+    valid_phoneme_list_glob: Optional[str] = None
+    valid_volume_glob: Optional[str] = None
+    valid_speaker_dict_path: Optional[Path] = None
+    valid_trial_num: Optional[int] = None
+    valid_num: Optional[int] = None
     seed: int = 0
 
 
