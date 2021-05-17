@@ -265,6 +265,8 @@ class UnbalancedSpeakerFeatureDataset(SpeakerFeatureDataset):
         ]
         self.weight = weight
 
+        assert len(self.weighted_indexes) > 0
+
     def __len__(self):
         return super().__len__() + len(self.weighted_indexes) * (self.weight - 1)
 
