@@ -2,8 +2,8 @@ from typing import List, Optional
 
 import torch
 from torch import Tensor, nn
-from yukarin_soso.config import CNNType, NetworkConfig
-from yukarin_soso.network.encoder import CNN, ResidualBottleneckCNN, SkipCNN
+from yukarin_soso.config import NetworkConfig
+from yukarin_soso.network.encoder import EncoderType, create_encoder
 
 
 class Predictor(nn.Module):
@@ -13,13 +13,14 @@ class Predictor(nn.Module):
         output_size: int,
         speaker_size: int,
         speaker_embedding_size: int,
-        cnn_type: CNNType,
+        cnn_type: EncoderType,
         cnn_hidden_size: int,
         cnn_kernel_size: int,
         cnn_layer_num: int,
         rnn_hidden_size: int,
         rnn_layer_num: int,
         ar_hidden_size: int,
+        ar_layer_num: int,
     ):
         super().__init__()
         self.output_size = output_size
@@ -36,40 +37,42 @@ class Predictor(nn.Module):
         input_size = input_feature_size + speaker_embedding_size
 
         # cnn
-        self.cnn = {
-            CNNType.cnn: CNN,
-            CNNType.skip_cnn: SkipCNN,
-            CNNType.residual_bottleneck_cnn: ResidualBottleneckCNN,
-        }[cnn_type](
+        self.cnn = create_encoder(
+            type=cnn_type,
             input_size=input_size,
             hidden_size=cnn_hidden_size,
             kernel_size=cnn_kernel_size,
             layer_num=cnn_layer_num,
         )
+        input_size = self.cnn.output_hidden_size
 
         # rnn
-        self.rnn = nn.GRU(
-            input_size=cnn_hidden_size,
-            hidden_size=rnn_hidden_size,
-            num_layers=rnn_layer_num,
-            batch_first=True,
-            bidirectional=True,
-        )
+        if rnn_hidden_size == 0 or rnn_layer_num == 0:
+            self.rnn = None
+        else:
+            self.rnn = nn.GRU(
+                input_size=input_size,
+                hidden_size=rnn_hidden_size,
+                num_layers=rnn_layer_num,
+                batch_first=True,
+                bidirectional=True,
+            )
+            input_size = rnn_hidden_size * 2
 
         # AR rnn
-        if ar_hidden_size == 0:
+        if ar_hidden_size == 0 or ar_layer_num == 0:
             self.ar_rnn = None
         else:
             self.ar_rnn = nn.GRU(
-                input_size=rnn_hidden_size * 2 + output_size,
+                input_size=input_size + output_size,
                 hidden_size=ar_hidden_size,
-                num_layers=1,
+                num_layers=ar_layer_num,
                 batch_first=True,
                 bidirectional=False,
             )
+            input_size = ar_hidden_size
 
         # post
-        input_size = rnn_hidden_size * 2 if ar_hidden_size == 0 else ar_hidden_size
         self.post = nn.Linear(
             in_features=input_size,
             out_features=output_size,
@@ -94,7 +97,8 @@ class Predictor(nn.Module):
             )  # (batch_size, length, ?)
 
         h = self.cnn(feature)  # (batch_size, length, ?)
-        h, _ = self.rnn(h)  # (batch_size, length, ?)
+        if self.rnn is not None:
+            h, _ = self.rnn(h)  # (batch_size, length, ?)
         return h
 
     def forward(
@@ -159,11 +163,12 @@ def create_predictor(config: NetworkConfig):
         output_size=config.output_size,
         speaker_size=config.speaker_size,
         speaker_embedding_size=config.speaker_embedding_size,
-        cnn_type=CNNType(config.cnn_type),
+        cnn_type=EncoderType(config.cnn_type),
         cnn_hidden_size=config.cnn_hidden_size,
         cnn_kernel_size=config.cnn_kernel_size,
         cnn_layer_num=config.cnn_layer_num,
         rnn_hidden_size=config.rnn_hidden_size,
         rnn_layer_num=config.rnn_layer_num,
         ar_hidden_size=config.ar_hidden_size,
+        ar_layer_num=config.ar_layer_num,
     )

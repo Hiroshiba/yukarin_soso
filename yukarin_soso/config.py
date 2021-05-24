@@ -1,16 +1,9 @@
 from dataclasses import dataclass, field
-from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from yukarin_soso.utility import dataclass_utility
 from yukarin_soso.utility.git_utility import get_branch_name, get_commit_id
-
-
-class CNNType(str, Enum):
-    cnn = "cnn"
-    skip_cnn = "skip_cnn"
-    residual_bottleneck_cnn = "res_bot_cnn"
 
 
 @dataclass
@@ -56,6 +49,7 @@ class NetworkConfig:
     rnn_hidden_size: int
     rnn_layer_num: int
     ar_hidden_size: int
+    ar_layer_num: int
 
 
 @dataclass
@@ -132,3 +126,6 @@ def backward_compatible(d: Dict[str, Any]):
         d["dataset"]["weighted_speaker_id"] = None
     if "speaker_weight" not in d["dataset"]:
         d["dataset"]["speaker_weight"] = None
+
+    if "ar_layer_num" not in d["network"]:
+        d["network"]["ar_layer_num"] = 0 if d["network"]["ar_hidden_size"] == 0 else 1
