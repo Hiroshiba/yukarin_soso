@@ -94,6 +94,10 @@ def create_trainer(
 
     trainer = Trainer(updater, stop_trigger=trigger_stop, out=output)
 
+    if config.train.step_shift is not None:
+        ext = extensions.StepShift(**config.train.step_shift)
+        trainer.extend(ext)
+
     ext = extensions.Evaluator(test_iter, model, device=device)
     trainer.extend(ext, name="test", trigger=trigger_log)
 
