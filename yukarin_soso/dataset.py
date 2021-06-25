@@ -3,10 +3,10 @@ from dataclasses import dataclass
 from enum import Enum
 from glob import glob
 from pathlib import Path
-from typing import Dict, List, Optional, Sequence, Union
+from typing import Dict, List, Optional, Sequence, Type, Union
 
 import numpy
-from acoustic_feature_extractor.data.phoneme import JvsPhoneme
+from acoustic_feature_extractor.data.phoneme import BasePhoneme, phoneme_type_to_class
 from acoustic_feature_extractor.data.sampling_data import SamplingData
 from torch.utils.data import ConcatDataset, Dataset
 from torch.utils.data._utils.collate import default_convert
@@ -17,7 +17,7 @@ mora_phoneme_list = ["a", "i", "u", "e", "o", "A", "I", "U", "E", "O", "N", "cl"
 voiced_phoneme_list = (
     ["a", "i", "u", "e", "o", "N"]
     + ["n", "m", "y", "r", "w", "g", "z", "j", "d", "b"]
-    + ["ny", "my", "ry", "gy", "by"]
+    + ["ny", "my", "ry", "gy", "by", "gw"]
 )
 
 
@@ -51,7 +51,7 @@ class Input:
     phoneme: SamplingData
     spec: SamplingData
     silence: SamplingData
-    phoneme_list: Optional[List[JvsPhoneme]]
+    phoneme_list: Optional[List[BasePhoneme]]
     volume: Optional[SamplingData]
 
 
@@ -63,6 +63,7 @@ class LazyInput:
     silence_path: Path
     phoneme_list_path: Optional[Path]
     volume_path: Optional[Path]
+    phoneme_class: Type[BasePhoneme]
 
     def generate(self):
         return Input(
@@ -71,7 +72,7 @@ class LazyInput:
             spec=SamplingData.load(self.spec_path),
             silence=SamplingData.load(self.silence_path),
             phoneme_list=(
-                JvsPhoneme.load_julius_list(self.phoneme_list_path)
+                self.phoneme_class.load_julius_list(self.phoneme_list_path)
                 if self.phoneme_list_path is not None
                 else None
             ),
@@ -105,7 +106,7 @@ class FeatureDataset(Dataset):
         phoneme_data: SamplingData,
         spec_data: SamplingData,
         silence_data: SamplingData,
-        phoneme_list_data: Optional[List[JvsPhoneme]],
+        phoneme_list_data: Optional[List[BasePhoneme]],
         volume_data: Optional[SamplingData],
         f0_process_mode: F0ProcessMode,
         time_mask_max_second: float,
@@ -348,6 +349,7 @@ def create_dataset(config: DatasetConfig):
                     phoneme_list_paths[fn] if phoneme_list_paths is not None else None
                 ),
                 volume_path=volume_paths[fn] if volume_paths is not None else None,
+                phoneme_class=phoneme_type_to_class[config.phoneme_type],
             )
             for fn in fns
         ]
@@ -453,6 +455,7 @@ def create_validation_dataset(config: DatasetConfig):
                 phoneme_list_paths[fn] if phoneme_list_paths is not None else None
             ),
             volume_path=volume_paths[fn] if volume_paths is not None else None,
+            phoneme_class=phoneme_type_to_class[config.phoneme_type],
         )
         for fn in valids
     ]
