@@ -21,4 +21,4 @@ RUN apt-get update && \
 
 # install requirements
 COPY requirements.txt /app/
-RUN pip install -r <(cat requirements.txt | grep -x -v torch)
+RUN pip install -r <(cat requirements.txt | grep -x -v torch) -r requirements_dev.txt

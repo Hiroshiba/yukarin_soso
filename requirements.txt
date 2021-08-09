@@ -1,12 +1,7 @@
 more_itertools
 numpy
-optuna
-pytest
 pyyaml
-tensorboardX
 torch
 torch_optimizer
 tqdm
-wandb
 git+https://github.com/Hiroshiba/acoustic_feature_extractor
-git+https://github.com/Hiroshiba/pytorch-trainer@1.3.2
